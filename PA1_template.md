@@ -1,3 +1,4 @@
+
 ##This is a solution for the peer assignment 1.
 
 ###Loading and preprocessing the data
@@ -44,9 +45,8 @@ median_number_of_steps
 ```
 ## [1] 10765
 ```
-We can even report it inline. Mean number of steps per day is 1.0766189 &times; 10<sup>4</sup> and medium number of steps is 10765.
+We can even report it inline. Mean number of steps per day is 10766.19 and median number of steps is 10765.
 
-Note: I should say that floating point number for 'mean' looks a bit weird in its scientific notation. Formatting can probably be fixed but I do not know how.
 
 ### What is the average daily activity pattern?
 First we will make a time series plot of the 5 minutes intervals and the average number of steps taken (x), averaged across all days (y).
@@ -79,19 +79,31 @@ missing_rows<-sum(is.na(datafile$steps))
 ```
 So we do not have data on 2304 rows.
 
-Lets replace missing values with average (i.e. mean) number of steps usually taken in this time interval. This average number is usually floating point number and will be rounded to the nearest integer.
-We will compute it into new database 'datafile2'. 
+Lets replace missing values with average (i.e. mean) number of steps usually taken in this time interval. 
+This average number is usually floating point number and will be rounded to the nearest integer.
+We will do it with the use of user-defined function 'corrected_steps' - it will have steps and interval as arguments, it will return steps if setps are valid or will compute and return average number of steps at that interval if steps are not defined (NA).
+
+```r
+corrected.steps<-function(steps,interval){
+        k<-length(steps)
+        steps2<-rep(0,k)
+        for (i in 1:k){
+                if (!is.na(steps[i])){
+                        steps2[i]<-steps[i]
+                }
+                else {
+                        steps2[i]<-stepsbyinterval$Average_steps[stepsbyinterval$interval==interval[i]]
+                }
+        }
+        return(round(steps2,digit=0))
+}
+```
+
+We will create new database 'datafile2' . 
 
 
 ```r
-datafile2<-datafile
-L<-dim(datafile2)[1]
-for (i in 1:L) {
-        if (is.na(datafile2$steps[i])){
-                datafile2$steps[i]<-round(stepsbyinterval$Average_steps[stepsbyinterval$interval==datafile$interval[i]],digits=0)
-        }
-# Average number is rounded to the nearest integer as number of steps is usually integer
-}
+datafile2<-mutate(datafile,corr.steps=corrected.steps(steps,interval))
 ```
 
 Now we will repeat histogram and calculation of mean and median for a new database.
@@ -99,13 +111,12 @@ Now we will repeat histogram and calculation of mean and median for a new databa
 
 
 ```r
-library(dplyr,warn.conflicts = FALSE)
 #data is grouped by date and than summarize is being applieddataframe
-stepsbydate2<-summarize(group_by(datafile2,date),Total_steps_per_day=sum(steps))
+stepsbydate2<-summarize(group_by(datafile2,date),Total_steps_per_day=sum(corr.steps))
 hist(stepsbydate2$Total_steps_per_day,xlab='Total steps per day',main='Steps per day(corrected)')
 ```
 
-![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png) 
+![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png) 
 
 Now we can calculate mean and median of total number of steps taken per day in the corrected dataset.
         First lets calculate the mean.
@@ -128,9 +139,9 @@ median_number_of_steps2
 ```
 ## [1] 10762
 ```
-Now we can compare old and new results inline. Mean number of steps per day was 1.0766189 &times; 10<sup>4</sup> and after correction is 1.0765639 &times; 10<sup>4</sup>.
+Now we can compare uncorrected and corrected results inline. Mean number of uncorrected steps per day is 10766.19 and after correction it is 10765.64.
 
-Median number of steps was 10765 and after correction is 1.0762 &times; 10<sup>4</sup> (again the inline number looks weird).
+Median number of steps was 10765 and after correction is 10762.
 
 As one can see the proposed correction did not change the mean and median much. What is interesting the corrected values are somewhat lower than initial data. This seems counterintuitive. Lets try to find number of missing dates in original and corrected datsets.
 
@@ -163,6 +174,7 @@ Lets add day of the week information to the corrected dataset
 
 ```r
 aWeekDay<-weekdays(strptime(datafile2$date,format("%Y-%m-%d ")))
+L<-dim(datafile2)[1]
 weekD<-rep("",L)
 for (i in 1:L) {
         if (aWeekDay[i] %in% c("Saturday","Sunday")) {
@@ -182,7 +194,7 @@ Now it is time to plot a comparison. I am going to use ggplot2 package
 ```r
 library(ggplot2)
 #Now we group not only by interval but also by weekend/weekday
-stepsbyinterval2<-summarize(group_by(datafile2,interval,weekD),Average_steps=mean(steps,na.rm=TRUE))
+stepsbyinterval2<-summarize(group_by(datafile2,interval,weekD),Average_steps=mean(corr.steps))
 
 g<-ggplot(stepsbyinterval2,aes(interval,Average_steps))+geom_line(size=1)
 g<-g+facet_grid(weekD~.,scales="free")
@@ -191,4 +203,13 @@ g<-g+labs(title=expression("Steps profiling weekends or weekdays"))
 g
 ```
 
-![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png) 
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png) 
+
+### Some final notes.
+I had a bit of a hard time to make R markdown to work. My solution was googled. In essence I needed to upgrade several software packages to the most recent version.
+Here is the list of version used for this project:
+R-studio - 0.98.1091
+R - 3.1.2
+dplyr - 0.4.1
+ggplot2 - 1.0.0
+rmarkdown - 0.4.2 
